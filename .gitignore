@@ -2,3 +2,4 @@ data/raw_games/
 .env
 .idx/
 .DS_Store
+.env
