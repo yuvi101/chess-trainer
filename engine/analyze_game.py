@@ -137,9 +137,22 @@ def analyze_all_games():
                     f"Blunders: {r['total_blunders']} | "
                     f"Moves analyzed: {r['moves_analyzed']}"
                 )
-                        
+
+def wait_for_engine(retries=5, delay=2):
+    """Try to connect to Stockfish over TCP before starting analysis."""
+    import socket
+    for attempt in range(retries):
+        try:
+            with socket.create_connection(("stockfish_engine", 3334), timeout=3):
+                logging.info("Stockfish engine is reachable.")
+                return True
+        except (ConnectionRefusedError, OSError):
+            logging.warning(f"Engine not ready, retrying in {delay}s... (attempt {attempt + 1}/{retries})")
+            time.sleep(delay)
+    raise RuntimeError("Could not connect to Stockfish engine after multiple attempts.")                        
 
 def main():
+    wait_for_engine()
     analyze_all_games()
 
 
