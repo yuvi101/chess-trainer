@@ -2,17 +2,13 @@ version: "3.9"
 
 services:
   stockfish:
-    build:
-      context: .
-      dockerfile: Dockerfile.stockfish
+    build: ./stockfish
     container_name: stockfish_engine
     ports:
     - "3334:3334"
 
   analyzer:
-    build:
-      context: .
-      dockerfile: Dockerfile.analyzer
+    build: ./engine
     container_name: chess_analyzer
     environment:
         - LICHESS_USERNAME=${LICHESS_USERNAME}
@@ -20,9 +16,7 @@ services:
       - stockfish
 
   collector:
-    build:
-      context: .
-      dockerfile: Dockerfile.collector
+    build: ./collectors
     container_name: chess_collector
     environment:
         - LICHESS_USERNAME=${LICHESS_USERNAME}

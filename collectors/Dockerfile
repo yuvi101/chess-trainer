@@ -4,15 +4,13 @@ WORKDIR /app
 
 # Install system deps if ever needed (good practice)
 RUN apt-get update && apt-get install -y \
-    netcat-openbsd \
-    gcc \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only requirements first (for Docker caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the project
+# COPY only the files in collectors/ into /app
 COPY . .
 
-CMD ["python", "engine/analyze_game.py"]
+CMD ["python", "lichess_collector.py"]
