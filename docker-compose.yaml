@@ -18,3 +18,11 @@ services:
         - LICHESS_USERNAME=${LICHESS_USERNAME}
     depends_on:
       - stockfish
+
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile.collector
+    container_name: chess_collector
+    environment:
+        - LICHESS_USERNAME=${LICHESS_USERNAME}

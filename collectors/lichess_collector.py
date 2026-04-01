@@ -2,7 +2,10 @@ import requests
 import os
 from io import StringIO
 
-USERNAME = "yuvi2"
+
+USERNAME = os.getenv("LICHESS_USERNAME")
+if not USERNAME:
+    raise RuntimeError("LICHESS_USERNAME environment variable is not set")
 MAX_GAMES = 20
 
 OUTPUT_DIR = "../data/raw_games"
