@@ -20,3 +20,20 @@ services:
     container_name: chess_collector
     environment:
         - LICHESS_USERNAME=${LICHESS_USERNAME}
+
+  
+  redis:
+    image: redis:7-alpine
+    restart: always
+
+  celery:
+    build: ./scheduler
+    depends_on:
+      - redis
+      - stockfish
+    environment:
+      - LICHESS_USERNAME=${LICHESS_USERNAME}
+    volumes:
+      - ./data:/app/data          # shared data folder for both scripts
+      - ./collector:/app/collector
+      - ./analyzer:/app/analyzer
