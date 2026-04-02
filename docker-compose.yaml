@@ -14,12 +14,17 @@ services:
         - LICHESS_USERNAME=${LICHESS_USERNAME}
     depends_on:
       - stockfish
+    volumes:
+      - ./shared:/app/shared
+      - ./engine:/app
 
   collector:
     build: ./collectors
     container_name: chess_collector
     environment:
         - LICHESS_USERNAME=${LICHESS_USERNAME}
+    volumes:
+      - ./shared:/app/shared
 
   
   redis:
@@ -37,3 +42,18 @@ services:
       - ./data:/app/data          # shared data folder for both scripts
       - ./collector:/app/collector
       - ./analyzer:/app/analyzer
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: chess
+      POSTGRES_PASSWORD: chess
+      POSTGRES_DB: chess_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:

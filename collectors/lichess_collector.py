@@ -1,6 +1,10 @@
 import requests
 import os
-from io import StringIO
+#from io import StringIO
+from shared.db import get_connection
+import json
+import logging
+
 
 
 USERNAME = os.getenv("LICHESS_USERNAME")
@@ -8,8 +12,14 @@ if not USERNAME:
     raise RuntimeError("LICHESS_USERNAME environment variable is not set")
 MAX_GAMES = 20
 
-OUTPUT_DIR = "../data/raw_games"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+# OUTPUT_DIR = "../data/raw_games"
+# os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+
 
 url = f"https://lichess.org/api/games/user/{USERNAME}"
 params = {
@@ -23,17 +33,47 @@ headers = {
     "Accept": "application/x-ndjson"
 }
 
-response = requests.get(url, params=params, headers=headers)
-response.raise_for_status()
 
-games = response.text.strip().split("\n")
-print(games)
+def save_game_to_db(game):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO games (lichess_id, played_at, opening, color, result, time_control, moves)
+            VALUES (%s, to_timestamp(%s / 1000.0), %s, %s, %s, %s, %s)
+            ON CONFLICT (lichess_id) DO NOTHING
+        """, (
+            game["id"],
+            game.get("createdAt"),
+            game.get("opening", {}).get("name"),
+            "white" if game["players"]["white"]["user"]["name"] == USERNAME else "black",
+            game.get("winner", "draw"),
+            str(game.get("clock", {}).get("initial")),
+            game.get("moves", "")
+        ))
+        conn.commit()
+        logging.info(f"Saved game {game['id']} to DB")
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Failed to save game {game['id']}: {e}")
+    finally:
+        cur.close()
+        conn.close()
 
-for idx, game_json in enumerate(games):
-    print(idx)
-    filename = os.path.join(OUTPUT_DIR, f"game_{idx}.json")
-    with open(filename, "w") as f:
-        f.write(game_json)
-        print(game_json)
+def fetch_games():
+    response = requests.get(url, params=params, headers=headers)
+    response.raise_for_status()
 
-print(f"Saved {len(games)} games to {OUTPUT_DIR}")
+    games = response.text.strip().split("\n")
+    logging.info(f"Fetched {len(games)} games from Lichess")
+    return games
+
+def main():
+    games = fetch_games()
+    for game_str in games:
+        game = json.loads(game_str)  # parse each line into a dict
+        save_game_to_db(game)
+    logging.info(f"Processed {len(games)} games.")
+
+if __name__ == "__main__":
+    main()

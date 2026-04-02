@@ -4,6 +4,10 @@ import chess
 import chess.engine
 import os
 import logging
+from shared.db import get_connection
+import time
+import socket
+
 
 # ------------------- CONFIG ----------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,9 +37,50 @@ logging.getLogger("").addHandler(console)
 # --------------------------------
  
 
-def load_game(path):
-    with open(path, "r") as f:
-        return json.load(f)
+# def load_game(path):
+#     with open(path, "r") as f:
+#         return json.load(f)
+
+def load_games_from_db():
+    """Load games that haven't been analyzed yet."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT g.id, g.lichess_id, g.moves, g.color
+        FROM games g
+        WHERE g.id NOT IN (SELECT DISTINCT game_id FROM moves)
+    """)
+    games = cur.fetchall()
+    cur.close()
+    conn.close()
+    return games
+
+
+def save_analysis_to_db(game_id, results):
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        for r in results:
+            cur.execute("""
+                INSERT INTO moves (game_id, move_number, move_played, best_move, cp_loss, label)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                game_id,
+                r["move_number"],
+                r["move_played"],
+                r["best_move"],
+                r["cp_loss"],
+                r["label"]
+            ))
+
+        conn.commit()
+        logging.info(f"Saved analysis for game {game_id}")
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Failed to save analysis for game {game_id}: {e}")
+    finally:
+        cur.close()
+        conn.close()
 
 
 def classify_move(cp_loss):
@@ -49,45 +94,36 @@ def classify_move(cp_loss):
         return "Blunder"
 
 
-def analyze_game(game_json, output_file, engine):
+def analyze_game(game_id, lichess_id, moves_str, color, engine):
     board = chess.Board()
-    moves = game_json["moves"].split()
+    moves = moves_str.split()
+
     if not moves:
-        logging.warning(f"Skipping game with no moves: {output_file.name}")
+        logging.warning(f"Skipping game {lichess_id} — no moves found")
         return None
 
-    username = USERNAME
-    white_player = game_json["players"]["white"]["user"]["name"]
-    my_color = chess.WHITE if username == white_player else chess.BLACK
+    my_color = chess.WHITE if color == "white" else chess.BLACK
 
     results = []
     total_cp_loss = 0
     total_blunders = 0
 
     for i, move in enumerate(moves):
-
-        # Only analyze BEFORE your move
         if board.turn == my_color:
             info_before = engine.analyse(board, chess.engine.Limit(depth=15))
             best_move = info_before["pv"][0]
-            # before move
             best_score = info_before["score"].pov(my_color).score(mate_score=10000)
-            
-            # Convert best move to SAN on the current board BEFORE playing your move
             best_move_san = board.san(best_move)
 
-            # Play your move
             try:
                 board.push_san(move)
             except Exception as e:
-                logging.error(f"Illegal move {move} in {output_file.name}: {e}")
+                logging.error(f"Illegal move {move} in game {lichess_id}: {e}")
                 break
 
             info_after = engine.analyse(board, chess.engine.Limit(depth=15))
-            # after move  
             after_score = info_after["score"].pov(my_color).score(mate_score=10000)
 
-            #cp_loss = best_score - after_score
             cp_loss = max(0, best_score - after_score)
             label = classify_move(cp_loss)
 
@@ -102,45 +138,38 @@ def analyze_game(game_json, output_file, engine):
                 "cp_loss": cp_loss,
                 "label": label,
             })
-
         else:
-            # Opponent move — just play it
             board.push_san(move)
 
-    with open(output_file, "w") as f:
-        json.dump(results, f, indent=2)
+    save_analysis_to_db(game_id, results)
 
     return {
-    "total_cp_loss": total_cp_loss,
-    "total_blunders": total_blunders,
-    "moves_analyzed": len(results)
+        "total_cp_loss": total_cp_loss,
+        "total_blunders": total_blunders,
+        "moves_analyzed": len(results)
     }
 
 
-
 def analyze_all_games():
+    games = load_games_from_db()
+    print(f"DEBUG: found {len(games)} unanalyzed games: {games}")
+    if not games:
+        logging.info("No unanalyzed games found.")
+        return
+
     with chess.engine.SimpleEngine.popen_uci(ENGINE_CMD) as engine:
-        for game_file in RAW_GAMES_DIR.glob("*.json"):
-            analysis_file = RESULTS_DIR / f"{game_file.stem}_analysis.json"
-            
-            # skip already analyzed games
-            if analysis_file.exists():
-                logging.info(f"Skipping already analyzed game: {game_file.name}")
-                continue
-            else:
-                game = load_game(game_file)
-                logging.info(f"Analyzing {game_file.name} ...")
-                r = analyze_game(game, analysis_file, engine)
-                logging.info(f"Done analyzing {game_file.name}")
+        for game_id, lichess_id, moves_str, color in games:
+            logging.info(f"Analyzing game {lichess_id} ...")
+            r = analyze_game(game_id, lichess_id, moves_str, color, engine)
+            if r:
                 logging.info(
-                    f"CP Loss: {r['total_cp_loss']} | "
+                    f"Done — CP Loss: {r['total_cp_loss']} | "
                     f"Blunders: {r['total_blunders']} | "
                     f"Moves analyzed: {r['moves_analyzed']}"
                 )
 
+
 def wait_for_engine(retries=5, delay=2):
-    """Try to connect to Stockfish over TCP before starting analysis."""
-    import socket
     for attempt in range(retries):
         try:
             with socket.create_connection(("stockfish_engine", 3334), timeout=3):
@@ -149,7 +178,8 @@ def wait_for_engine(retries=5, delay=2):
         except (ConnectionRefusedError, OSError):
             logging.warning(f"Engine not ready, retrying in {delay}s... (attempt {attempt + 1}/{retries})")
             time.sleep(delay)
-    raise RuntimeError("Could not connect to Stockfish engine after multiple attempts.")                        
+    raise RuntimeError("Could not connect to Stockfish engine after multiple attempts.")
+
 
 def main():
     wait_for_engine()

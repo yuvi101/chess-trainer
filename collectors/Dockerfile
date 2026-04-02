@@ -13,4 +13,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # COPY only the files in collectors/ into /app
 COPY . .
 
+
 CMD ["python", "lichess_collector.py"]
