@@ -43,6 +43,24 @@ services:
       - ./collector:/app/collector
       - ./analyzer:/app/analyzer
 
+
+  reporting:
+    build: ./reporting
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=chess_db
+      - POSTGRES_USER=chess
+      - POSTGRES_PASSWORD=chess
+    volumes:
+      - ./shared:/app/shared
+      - ./reporting:/app
+      - ./reports:/app/reports
+    depends_on:
+      - postgres
+
   postgres:
     image: postgres:16-alpine
     restart: always

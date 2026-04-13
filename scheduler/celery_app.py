@@ -22,6 +22,11 @@ app.conf.beat_schedule = {
         "task": "tasks.analyze_games",
         "schedule": crontab(hour=7, minute=30, day_of_week="mon,thu"),
     },
+
+    "generate-report": {
+    "task": "tasks.generate_report",
+    "schedule": crontab(hour=8, minute=0, day_of_week="fri"),  # every Friday morning
+},
 }
 
 app.conf.timezone = "UTC"

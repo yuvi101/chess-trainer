@@ -29,7 +29,8 @@ def init_db():
             color VARCHAR(5),
             result VARCHAR(10),
             time_control VARCHAR(20),
-            moves TEXT
+            moves TEXT,
+            opponent VARCHAR(50)
         );
     """)
 

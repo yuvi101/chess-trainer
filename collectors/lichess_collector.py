@@ -38,21 +38,29 @@ def save_game_to_db(game):
     conn = get_connection()
     cur = conn.cursor()
     try:
+        # Determine opponent name
+        white_name = game["players"]["white"]["user"]["name"]
+        black_name = game["players"]["black"]["user"]["name"]
+
+        my_color = "white" if white_name == USERNAME else "black"
+        opponent = black_name if white_name == USERNAME else white_name
+
         cur.execute("""
-            INSERT INTO games (lichess_id, played_at, opening, color, result, time_control, moves)
-            VALUES (%s, to_timestamp(%s / 1000.0), %s, %s, %s, %s, %s)
-            ON CONFLICT (lichess_id) DO NOTHING
+            INSERT INTO games (lichess_id, played_at, opening, color, result, time_control, moves, opponent)
+            VALUES (%s, to_timestamp(%s / 1000.0), %s, %s, %s, %s, %s, %s)
         """, (
             game["id"],
             game.get("createdAt"),
             game.get("opening", {}).get("name"),
-            "white" if game["players"]["white"]["user"]["name"] == USERNAME else "black",
+            my_color,
+            # "white" if game["players"]["white"]["user"]["name"] == USERNAME else "black",
             game.get("winner", "draw"),
             str(game.get("clock", {}).get("initial")),
-            game.get("moves", "")
+            game.get("moves", ""),
+            opponent
         ))
         conn.commit()
-        logging.info(f"Saved game {game['id']} to DB")
+        logging.info(f"Saved game {game['id']} to DB — you played {my_color} vs {opponent}")
     except Exception as e:
         conn.rollback()
         logging.error(f"Failed to save game {game['id']}: {e}")

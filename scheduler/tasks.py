@@ -32,3 +32,16 @@ def analyze_games():
         raise RuntimeError(result.stderr)
     logging.info("Analysis done.")
     return result.stdout
+
+@app.task
+def generate_report():
+    result = subprocess.run(
+        ["python", "/app/reporting/report_generator.py"],
+        capture_output=True,
+        text=True
+    )
+    if result.returncode != 0:
+        logging.error(f"Report generation failed: {result.stderr}")
+        raise RuntimeError(result.stderr)
+    logging.info("Report generated successfully.")
+    return result.stdout
