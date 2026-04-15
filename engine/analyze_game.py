@@ -7,6 +7,7 @@ import logging
 from shared.db import get_connection
 import time
 import socket
+from shared.metrics import push_metrics
 
 
 # ------------------- CONFIG ----------------------
@@ -152,21 +153,43 @@ def analyze_game(game_id, lichess_id, moves_str, color, engine):
 
 def analyze_all_games():
     games = load_games_from_db()
-    print(f"DEBUG: found {len(games)} unanalyzed games: {games}")
     if not games:
         logging.info("No unanalyzed games found.")
         return
+    
+    total_analyzed = 0
+    total_blunders = 0
+    total_failures = 0
+    total_duration = 0
 
     with chess.engine.SimpleEngine.popen_uci(ENGINE_CMD) as engine:
         for game_id, lichess_id, moves_str, color in games:
             logging.info(f"Analyzing game {lichess_id} ...")
-            r = analyze_game(game_id, lichess_id, moves_str, color, engine)
-            if r:
-                logging.info(
-                    f"Done — CP Loss: {r['total_cp_loss']} | "
-                    f"Blunders: {r['total_blunders']} | "
-                    f"Moves analyzed: {r['moves_analyzed']}"
-                )
+            start = time.time()
+
+            try:
+                r = analyze_game(game_id, lichess_id, moves_str, color, engine)
+                duration = time.time() - start
+                total_duration += duration
+                if r:
+                    total_analyzed += 1
+                    total_blunders += r["total_blunders"]
+                    logging.info(
+                        f"Done — CP Loss: {r['total_cp_loss']} | "
+                        f"Blunders: {r['total_blunders']} | "
+                        f"Moves analyzed: {r['moves_analyzed']}"
+                        f"Duration: {duration:.2f}s"
+                    )
+            except Exception as e:
+                logging.error(f"Failed to analyze game {lichess_id}: {e}")
+                total_failures += 1
+    
+    push_metrics("analyzer", {
+        "games_analyzed_total": total_analyzed,
+        "blunders_total": total_blunders,
+        "pipeline_failures_total": total_failures,
+        "analysis_duration_seconds": total_duration,
+    })
 
 
 def wait_for_engine(retries=5, delay=2):

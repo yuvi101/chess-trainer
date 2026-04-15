@@ -12,6 +12,7 @@ services:
     container_name: chess_analyzer
     environment:
         - LICHESS_USERNAME=${LICHESS_USERNAME}
+        - PUSHGATEWAY_URL=pushgateway:9091
     depends_on:
       - stockfish
     volumes:
@@ -23,6 +24,7 @@ services:
     container_name: chess_collector
     environment:
         - LICHESS_USERNAME=${LICHESS_USERNAME}
+        - PUSHGATEWAY_URL=pushgateway:9091
     volumes:
       - ./shared:/app/shared
 
@@ -54,6 +56,7 @@ services:
       - POSTGRES_DB=chess_db
       - POSTGRES_USER=chess
       - POSTGRES_PASSWORD=chess
+      - PUSHGATEWAY_URL=pushgateway:9091
     volumes:
       - ./shared:/app/shared
       - ./reporting:/app
@@ -73,5 +76,54 @@ services:
     ports:
       - "5432:5432"
 
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    user: "0"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    # networks:
+    #   default: null
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+      # - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/
+      # - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000/
+      - GF_SERVER_DOMAIN=localhost
+      # - GF_SECURITY_COOKIE_SECURE=fasle
+      # - GF_SECURITY_CSRF_TRUSTED_ORIGINS=http://prometheus:9090
+      # - GF_SECURITY_CSRF_TRUSTED_ORIGINS=http://localhost:9090
+    volumes:
+      # - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+
+  pushgateway:
+    image: prom/pushgateway:latest
+    restart: always
+    ports:
+      - "9091:9091"
+    networks:
+      default: null
+
 volumes:
   postgres_data:
+    name: chess-trainer_postgres_data
+  prometheus_data:
+    name: chess-trainer_prometheus_data
+  grafana_data:
+    name: chess-trainer_grafana_data
