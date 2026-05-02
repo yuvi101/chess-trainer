@@ -215,7 +215,8 @@ def analyze_all_games():
                     total_inaccuracies += r.get("total_inaccuracies", 0)
                     total_good_moves += r.get("total_good_moves", 0)
                     total_moves_analyzed += r["moves_analyzed"]
-                    total_cp_loss_all_games += r["total_cp_loss"]
+                    #total_cp_loss_all_games += r["total_cp_loss"]
+                    total_cp_loss_all_games += (r["total_cp_loss"] / r["moves_analyzed"])
                     logging.info(
                         # f"Done — CP Loss: {r['total_cp_loss']} | "
                         f"Done — CP Loss: {r['total_cp_loss'] / r['moves_analyzed']:.2f} | "
