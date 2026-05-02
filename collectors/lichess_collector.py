@@ -4,6 +4,8 @@ import os
 from shared.db import get_connection
 import json
 import logging
+import time
+from shared.metrics import push_metrics
 
 
 
@@ -77,10 +79,27 @@ def fetch_games():
     return games
 
 def main():
+    start = time.time()
+    failures = 0
+    games_collected = 0
+
     games = fetch_games()
     for game_str in games:
-        game = json.loads(game_str)  # parse each line into a dict
-        save_game_to_db(game)
+        try:
+            game = json.loads(game_str)  # parse each line into a dict
+            save_game_to_db(game)
+        except Exception as e:
+            logging.error(f"Failed to save game: {e}")
+            failures += 1
+    
+    duration = time.time() - start
+
+    push_metrics("collector", {
+        "games_collected_total": games_collected,
+        "pipeline_failures_total": failures,
+        "collection_duration_seconds": duration,
+    })
+
     logging.info(f"Processed {len(games)} games.")
 
 if __name__ == "__main__":

@@ -6,6 +6,8 @@ import chess.svg
 import re
 from shared.db import get_connection
 from llm_client import call_llm
+import time
+from shared.metrics import push_metrics
 
 # ---------- Logging ----------
 logging.basicConfig(
@@ -415,12 +417,14 @@ def generate_html_report(report_text, boards, stats):
 # ---------- Main ----------
 def main():
     os.makedirs("/app/reports", exist_ok=True)
+    start = time.time()
 
     logging.info("Fetching weekly data...")
     rows = fetch_weekly_data()
 
     if not rows:
         logging.info("No data found.")
+        push_metrics("reporter", {"pipeline_failures_total": 1})
         return
 
     logging.info(f"Aggregating stats for {len(rows)} moves...")
@@ -443,6 +447,15 @@ def main():
     report_path = f"/app/reports/report_{datetime.now().strftime('%Y%m%d')}.html"
     with open(report_path, "w") as f:
         f.write(html)
+
+    duration = time.time() - start
+    push_metrics("reporter", {
+        "llm_tokens_total": report["tokens_used"],
+        "llm_cost_usd_total": report["cost_usd"],
+        "llm_request_duration_seconds": report["latency_ms"] / 1000,
+        "report_generation_duration_seconds": duration,
+        "pipeline_failures_total": 0,
+    })
 
     logging.info(f"Report saved to {report_path}")
 
