@@ -42,13 +42,15 @@ logging.getLogger("").addHandler(console)
 #         return json.load(f)
 
 def load_games_from_db():
-    """Load games that haven't been analyzed yet."""
+    """Load games that haven't been analyzed yet from the past 7 days only."""
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
         SELECT g.id, g.lichess_id, g.moves, g.color
         FROM games g
-        WHERE g.id NOT IN (SELECT DISTINCT game_id FROM moves)
+        WHERE g.played_at >= NOW() - INTERVAL '7 days'
+            AND g.id NOT IN (SELECT DISTINCT game_id FROM moves)
+        ORDER BY g.played_at DESC
     """)
     games = cur.fetchall()
     cur.close()

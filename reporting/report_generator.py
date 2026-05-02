@@ -34,7 +34,7 @@ def fetch_weekly_data():
             g.opponent
         FROM games g
         JOIN moves m ON m.game_id = g.id
-        WHERE g.played_at >= NOW() - INTERVAL '999 days'
+        WHERE g.played_at >= NOW() - INTERVAL '7 days'
         ORDER BY g.played_at DESC, m.move_number ASC
     """)
     rows = cur.fetchall()

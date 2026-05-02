@@ -42,7 +42,8 @@ def init_db():
             move_played VARCHAR(10),
             best_move VARCHAR(10),
             cp_loss INTEGER,
-            label VARCHAR(20)
+            label VARCHAR(20),
+            analyzed_at TIMESTAMP DEFAULT NOW()
         );
     """)
 
