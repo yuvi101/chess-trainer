@@ -94,6 +94,11 @@ def classify_move(cp_loss):
     else:
         return "Blunder"
 
+def get_cp(score, color):
+    s = score.pov(color)
+    if s.is_mate():
+        return 10000 if s.mate() > 0 else -10000
+    return s.score()
 
 def analyze_game(game_id, lichess_id, moves_str, color, engine):
     board = chess.Board()
@@ -106,47 +111,71 @@ def analyze_game(game_id, lichess_id, moves_str, color, engine):
     my_color = chess.WHITE if color == "white" else chess.BLACK
 
     results = []
-    total_cp_loss = 0
     total_blunders = 0
+    total_mistakes = 0
+    total_inaccuracies = 0
+    total_good_moves = 0
+    total_cp_loss = 0
+    
+    depth = 20
+    # Get starting evaluation
+    info_start = engine.analyse(board, chess.engine.Limit(depth=depth))
+    start_eval = info_start["score"].pov(my_color).score(mate_score=1000)
+    
+    end_eval = None
+    my_moves = 0
 
     for i, move in enumerate(moves):
         if board.turn == my_color:
-            info_before = engine.analyse(board, chess.engine.Limit(depth=15))
+            info_before = engine.analyse(board, chess.engine.Limit(depth=depth))
             best_move = info_before["pv"][0]
-            best_score = info_before["score"].pov(my_color).score(mate_score=10000)
+            #best_score = info_before["score"].pov(my_color).score(mate_score=1000)
+            best_score = get_cp(info_before["score"], my_color)
             best_move_san = board.san(best_move)
+            my_moves += 1
 
             try:
                 board.push_san(move)
             except Exception as e:
                 logging.error(f"Illegal move {move} in game {lichess_id}: {e}")
                 break
-
-            info_after = engine.analyse(board, chess.engine.Limit(depth=15))
+            info_after = engine.analyse(board, chess.engine.Limit(depth=depth))
             after_score = info_after["score"].pov(my_color).score(mate_score=10000)
 
             cp_loss = max(0, best_score - after_score)
             label = classify_move(cp_loss)
-
             total_cp_loss += cp_loss
+
             if label == "Blunder":
                 total_blunders += 1
+            elif label == "Mistake":
+                total_mistakes += 1
+            elif label == "Inaccuracy":
+                total_inaccuracies += 1
+            elif label == "Good":
+                total_good_moves += 1
 
             results.append({
                 "move_number": (i // 2) + 1,
                 "move_played": move,
                 "best_move": best_move_san,
-                "cp_loss": cp_loss,
+                #"cp_loss": cp_loss,
+                "cp_loss": total_cp_loss,
                 "label": label,
             })
+            
         else:
             board.push_san(move)
+    # Save to DB
 
     save_analysis_to_db(game_id, results)
 
     return {
         "total_cp_loss": total_cp_loss,
         "total_blunders": total_blunders,
+        "total_mistakes": total_mistakes,
+        "total_inaccuracies": total_inaccuracies,
+        "total_good_moves": total_good_moves,
         "moves_analyzed": len(results)
     }
 
@@ -161,6 +190,14 @@ def analyze_all_games():
     total_blunders = 0
     total_failures = 0
     total_duration = 0
+    engine_crash_count = 0
+    timeout_count = 0
+    unknown_error_count = 0
+    total_moves_analyzed = 0
+    total_mistakes = 0
+    total_inaccuracies = 0
+    total_good_moves = 0
+    total_cp_loss_all_games = 0
 
     with chess.engine.SimpleEngine.popen_uci(ENGINE_CMD) as engine:
         for game_id, lichess_id, moves_str, color in games:
@@ -174,21 +211,66 @@ def analyze_all_games():
                 if r:
                     total_analyzed += 1
                     total_blunders += r["total_blunders"]
+                    total_mistakes += r.get("total_mistakes", 0)
+                    total_inaccuracies += r.get("total_inaccuracies", 0)
+                    total_good_moves += r.get("total_good_moves", 0)
+                    total_moves_analyzed += r["moves_analyzed"]
+                    total_cp_loss_all_games += r["total_cp_loss"]
                     logging.info(
-                        f"Done — CP Loss: {r['total_cp_loss']} | "
+                        # f"Done — CP Loss: {r['total_cp_loss']} | "
+                        f"Done — CP Loss: {r['total_cp_loss'] / r['moves_analyzed']:.2f} | "
                         f"Blunders: {r['total_blunders']} | "
                         f"Moves analyzed: {r['moves_analyzed']}"
                         f"Duration: {duration:.2f}s"
                     )
-            except Exception as e:
-                logging.error(f"Failed to analyze game {lichess_id}: {e}")
+
+            except chess.engine.EngineTerminatedError as e:
+                logging.error(f"Engine crashed on game {lichess_id}: {e}")
                 total_failures += 1
+                engine_crash_count += 1  # track this separately
+            
+            except TimeoutError as e:
+                logging.error(f"Engine timeout on game {lichess_id}: {e}")
+                total_failures += 1
+                timeout_count += 1  # track this separately
+            
+            except Exception as e:
+                logging.error(f"Unknown error analyzing game {lichess_id}: {e}")
+                total_failures += 1
+                unknown_error_count += 1  # track this separately
+
+    # Calculate averages
+    avg_cp_loss_per_game = (total_cp_loss_all_games / total_analyzed) if total_analyzed > 0 else 0
+    avg_cp_loss_per_move = (total_cp_loss_all_games / total_moves_analyzed) if total_moves_analyzed > 0 else 0
+
+    # Calculate percentages
+    blunder_rate = (total_blunders / total_moves_analyzed * 100) if total_moves_analyzed > 0 else 0
+    mistake_rate = (total_mistakes / total_moves_analyzed * 100) if total_moves_analyzed > 0 else 0
+    inaccuracy_rate = (total_inaccuracies / total_moves_analyzed * 100) if total_moves_analyzed > 0 else 0
+    accuracy_rate = (total_good_moves / total_moves_analyzed * 100) if total_moves_analyzed > 0 else 0
+
+
     
     push_metrics("analyzer", {
         "games_analyzed_total": total_analyzed,
         "blunders_total": total_blunders,
+        "mistakes_total": total_mistakes,
+        "inaccuracies_total": total_inaccuracies,
+        "good_moves_total": total_good_moves,
+        "moves_analyzed_total": total_moves_analyzed,
+        "analysis_duration_seconds": total_duration,
+        "engine_crash_errors_total": engine_crash_count,
+        "engine_timeout_errors_total": timeout_count,
+        "unknown_errors_total": unknown_error_count,
+        "blunder_rate_percentage": blunder_rate,
+        "mistake_rate_percentage": mistake_rate,
+        "inaccuracy_rate_percentage": inaccuracy_rate,
+        "accuracy_percentage": accuracy_rate,
         "pipeline_failures_total": total_failures,
         "analysis_duration_seconds": total_duration,
+        "total_cp_loss": total_cp_loss_all_games,
+        "avg_cp_loss_per_game": avg_cp_loss_per_game,
+        "avg_cp_loss_per_move": avg_cp_loss_per_move,
     })
 
 
