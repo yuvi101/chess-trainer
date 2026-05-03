@@ -4,6 +4,7 @@
 
 An AI-powered platform that analyzes your Lichess games with Stockfish, generates personalized weekly coaching reports using LLMs, and tracks your improvement over time with full observability.
 
+Example of a generated report:
 ![Coaching Report](docs/report.png)
 
 ## 🎯 What It Does
@@ -155,7 +156,8 @@ Edit `scheduler/celery_app.py` to customize.
 | `llm_request_duration_seconds` | LLM latency |
 | `analysis_duration_seconds` | Stockfish runtime |
 
-
+##### Snapshot of Grafana dashboard:
+![example dashboard](docs/dashboard.png)
 ---
 
 
