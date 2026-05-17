@@ -30,7 +30,8 @@ Example of a generated report:
 │  └──────────┘  └──────────┘  └───────────────────┘  │
 └─────────────────────────────────────────────────────┘
 ```
-_Local self-hosting is also supported._
+<small>_Local self-hosting is also supported._<small>
+
 ---
 
 ## 🎯 What It Does
