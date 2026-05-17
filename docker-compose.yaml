@@ -35,16 +35,29 @@ services:
 
   celery:
     build: ./scheduler
+    command: celery -A celery_app worker --loglevel=info
     depends_on:
       - redis
       - stockfish
     environment:
       - LICHESS_USERNAME=${LICHESS_USERNAME}
     volumes:
-      - ./data:/app/data          # shared data folder for both scripts
+      #- ./data:/app/data          # shared data folder for both scripts
       - ./collector:/app/collector
       - ./analyzer:/app/analyzer
+      - ./shared:/app/shared
 
+  celery-beat:
+    build: ./scheduler
+    command: celery -A celery_app beat --loglevel=info
+    depends_on:
+      - redis
+    environment:
+      - LICHESS_USERNAME=${LICHESS_USERNAME}
+    volumes:
+      - ./collectors:/app/collector
+      - ./engine:/app/analyzer
+      - ./shared:/app/shared
 
   reporting:
     build: ./reporting
