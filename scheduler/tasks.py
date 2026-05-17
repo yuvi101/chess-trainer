@@ -1,5 +1,6 @@
 import subprocess
 from celery_app import app
+from celery import chain
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -45,3 +46,13 @@ def generate_report():
         raise RuntimeError(result.stderr)
     logging.info("Report generated successfully.")
     return result.stdout
+
+
+@app.task
+def run_full_pipeline():
+    logging.info("🚀 Starting full pipeline...")
+    chain(
+        collect_games.si(),
+        analyze_games.si(),
+        generate_report.si()
+    ).apply_async()
