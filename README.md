@@ -1,11 +1,37 @@
-# Chess trainer
-
 # ♟️ Chess Game Intelligence Agent Platform
 
-An AI-powered platform that analyzes your Lichess games with Stockfish, generates personalized weekly coaching reports using LLMs, and tracks your improvement over time with full observability.
+An automated chess analysis platform that collects your games from Lichess, analyzes them with Stockfish and AI, generates weekly reports, and visualizes your progress through a Grafana dashboard.
+
+Built with a production-grade infrastructure: containerized microservices, automated scheduling with Celery, cloud deployment on AWS via Terraform, and a full observability stack.
 
 Example of a generated report:
+
 ![Coaching Report](docs/report.png)
+
+---
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    AWS EC2 Instance                 │
+│                                                     │
+│  ┌─────────────┐    ┌──────────────────────────┐    │
+│  │ celery-beat │───►│      celery worker       │    │
+│  │  scheduler  │    │  collect → analyze →     │    │
+│  └─────────────┘    │       report             │    │
+│                     └──────────────────────────┘    │
+│                                                     │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
+│  │ Postgres │  │  Redis   │  │     Stockfish     │  │
+│  └──────────┘  └──────────┘  └───────────────────┘  │
+│                                                     │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
+│  │ Grafana  │  │Prometheus│  │   Pushgateway     │  │
+│  └──────────┘  └──────────┘  └───────────────────┘  │
+└─────────────────────────────────────────────────────┘
+```
+[!NOTE] Local self-hosting is also supported.
+---
 
 ## 🎯 What It Does
 
@@ -15,8 +41,8 @@ Every week, this platform:
 2. **Analyzes each move** with Stockfish (depth 20)
 3. **Identifies patterns** — blunders, mistakes, opening weaknesses
 4. **Generates a coaching report** using Gemini AI with personalized feedback
-5. **Tracks metrics** — cost per run, blunder rate over time, LLM latency
-6. **Sends you an HTML report** with board diagrams for every mistake
+5. **Tracks metrics** — cost per run, blunder rate over time, LLM latency etc.
+6. **Generates you an HTML report** with board diagrams with insights and recommendations
 
 It's like having a personal chess coach who never sleeps.
 
@@ -66,6 +92,7 @@ It's like having a personal chess coach who never sleeps.
 | Layer | Technology |
 |---|---|
 | **Language** | Python 3.11 |
+| **Infrastructure** | Terraform, AWS EC2 |
 | **Chess Engine** | Stockfish (compiled from source) |
 | **LLM** | Gemini 1.5 Flash (free tier) |
 | **Database** | PostgreSQL 16 |
@@ -82,16 +109,19 @@ It's like having a personal chess coach who never sleeps.
 - Docker & Docker Compose
 - Lichess account
 - Gemini API key (free at https://aistudio.google.com)
+- For cloud deployment + an AWS account
 
-### Setup
+---
 
-1. **Clone the repo**
+### Quick Start — Local Setup
+
+**1. Clone the repo**
 ```bash
 git clone https://github.com/yourusername/chess-trainer.git
 cd chess-trainer
 ```
 
-2. **Set environment variables**
+**2. Set environment variables**
 ```bash
 cat > .env << EOF
 LICHESS_USERNAME=your_username
@@ -100,47 +130,134 @@ LLM_PROVIDER=gemini
 EOF
 ```
 
-3. **Start the stack**
+**3. Start the stack**
 ```bash
 docker compose up -d
 ```
 
-4. **Initialize the database**
+That's it. The pipeline runs automatically every Friday. To trigger it manually for testing:
 ```bash
-docker compose run --rm collector python -c "from shared.db import init_db; init_db()"
+docker-compose exec celery -- celery -A celery_app call tasks.run_full_pipeline
 ```
 
-5. **Run the pipeline**
+**4. Access your dashboards**
+
+| Service | URL |
+|---|---|
+| Grafana | http://localhost:3000 (admin / admin) |
+| Prometheus | http://localhost:9090 |
+| Pushgateway | http://localhost:9091 |
+
+---
+
+### Cloud Deployment — AWS
+
+#### First-time setup
+
+**1. Install and configure AWS CLI**
 ```bash
-# Collect games
-docker compose run --rm collector python lichess_collector.py
-
-# Analyze games
-docker compose run --rm analyzer python analyze_game.py
-
-# Generate report
-docker compose run --rm reporting python report_generator.py
+aws configure
+# Enter your IAM user Access Key ID, Secret, and region (e.g. eu-central-1)
 ```
 
-6. **View your report**
+> **Note:** It is recommended to noy use root account credentials (You will see a note about it in the AWS console when trying to get the keys). I would recommend you to reate an IAM user with `AdministratorAccess` and use those keys instead.
+
+**2. Create your Terraform variables file**
 ```bash
-open reports/report_$(date +%Y%m%d).html
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+```
+Edit `terraform.tfvars`:
+```hcl
+project_name  = "chess-trainer-platform"
+instance_type = "t3.micro"
+admin_ip_cidr = "YOUR_IP/32"  # find your IP at whatismyip.com
 ```
 
-7. **View metrics**
-- Grafana: http://localhost:3000
-- Prometheus: http://localhost:9090
-- Pushgateway: http://localhost:9091
+#### Deploy
+
+```bash
+# Validate configuration
+terraform init
+terraform validate
+terraform plan
+
+# Deploy to AWS
+terraform apply
+```
+
+#### Connect to your instance
+
+```bash
+# Get your instance ID
+aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=chess-trainer-platform" \
+  --query "Reservations[].Instances[].InstanceId" \
+  --output text
+
+# Connect via SSM (no SSH key or open ports needed)
+aws ssm start-session --target <instance-id>
+```
+
+#### Start the application
+
+Once connected to the instance:
+```bash
+git clone https://github.com/yourusername/chess-trainer.git
+cd chess-trainer
+# fill in your credentials
+cat > .env << EOF
+LICHESS_USERNAME=your_username
+GEMINI_API_KEY=your_key_here
+LLM_PROVIDER=gemini
+EOF
+docker-compose up -d
+```
+
+#### Access your dashboards
+
+Get your instance's public IP:
+```bash
+aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=chess-trainer-platform" \
+  --query "Reservations[].Instances[].PublicIpAddress" \
+  --output text
+```
+
+Then open in your browser:
+
+| Service | URL |
+|---|---|
+| Grafana | http://\<public-ip\>:3000 |
+| Reports | http://\<public-ip\>:80 |
+
+#### Tear down
+
+To avoid being charged:
+
+```bash
+terraform destroy
+```
 
 ---
 
 ## 📅 Automated Schedule
 
-By default, the pipeline runs:
-- **Twice a week** (Monday & Thursday at 8:00 AM)
-- **Report generation** (Friday at 9:00 AM)
+By default, the pipeline runs every Friday at 7:00 AM UTC.
 
 Edit `scheduler/celery_app.py` to customize.
+
+---
+
+## Infrastructure Security
+
+- **No open SSH port** — access via AWS Systems Manager Session Manager only - no SSH
+- **IMDSv2 enforced** — protects against SSRF attacks on instance metadata
+- **Encrypted EBS volume** — root volume encrypted at rest
+- **IAM instance profile** — uses role-based access, no hardcoded AWS credentials
+- **Restricted admin access** — Grafana port locked to your IP only
+- **Dependency scanning** — Snyk SCA runs on every push via GitHub Actions
+- **Source code testing** — Semgrep SAST runs on every push via GitHub Actions
 
 ---
 
@@ -158,9 +275,8 @@ Edit `scheduler/celery_app.py` to customize.
 
 ##### Snapshot of Grafana dashboard:
 ![example dashboard](docs/dashboard.png)
+
 ---
-
-
 
 ## 🙏 Acknowledgments
 
