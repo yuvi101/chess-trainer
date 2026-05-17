@@ -3,3 +3,11 @@ data/raw_games/
 .idx/
 .DS_Store
 .env
+
+# Terraform
+terraform.tfvars
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
