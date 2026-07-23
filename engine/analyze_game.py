@@ -102,6 +102,9 @@ def get_cp(score, color):
         return 10000 if s.mate() > 0 else -10000
     return s.score()
 
+def compute_cp_loss(best_score, after_score):
+    return max(0, best_score - after_score)
+
 def analyze_game(game_id, lichess_id, moves_str, color, engine):
     board = chess.Board()
     moves = moves_str.split()
@@ -144,7 +147,7 @@ def analyze_game(game_id, lichess_id, moves_str, color, engine):
             info_after = engine.analyse(board, chess.engine.Limit(depth=depth))
             after_score = info_after["score"].pov(my_color).score(mate_score=10000)
 
-            cp_loss = max(0, best_score - after_score)
+            cp_loss = compute_cp_loss(best_score, after_score)
             label = classify_move(cp_loss)
             total_cp_loss += cp_loss
 
@@ -161,8 +164,7 @@ def analyze_game(game_id, lichess_id, moves_str, color, engine):
                 "move_number": (i // 2) + 1,
                 "move_played": move,
                 "best_move": best_move_san,
-                #"cp_loss": cp_loss,
-                "cp_loss": total_cp_loss,
+                "cp_loss": cp_loss,
                 "label": label,
             })
             

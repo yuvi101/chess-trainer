@@ -76,7 +76,7 @@ def aggregate_stats(rows):
         games[lichess_id]["total_cp_loss"] += cp_loss
         if row[8] == "Blunder":
             games[lichess_id]["blunders"].append(row)
-        if row[8] == "Good" and cp_loss == 0:
+        if row[8] == "Good":
             games[lichess_id]["good_moves"].append(row)
 
     avg_cp_loss = sum(r[7] for r in rows) / total_moves if total_moves > 0 else 0
@@ -210,7 +210,7 @@ def build_prompt(stats):
         game = stats["games"][lichess_id]
         #game_label = f"Game {game['game_number']} (vs {game['opponent']})"
         good_move_details += (
-            f"- Game {g[0]}, Move {g[4]}: {g[5]} (0 CP loss, perfect move)\n"
+            f"- Game {g[0]}, Move {g[4]}: {g[5]} (CP loss: {g[7]})\n"
         )
 
     opening_summary = {}
