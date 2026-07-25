@@ -7,7 +7,7 @@ jobs:
     name: Ruff Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v4
         with:
@@ -23,7 +23,7 @@ jobs:
     name: Docker Compose Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build all images
         run: docker compose build
@@ -32,7 +32,7 @@ jobs:
     name: Pytest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v4
         with:
