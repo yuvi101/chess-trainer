@@ -1,8 +1,11 @@
-data/raw_games/
+data/
 .env
 .idx/
 .DS_Store
 .env
+__pycache__/
+*.pyc
+.pytest_cache/
 
 # Terraform
 terraform.tfvars
