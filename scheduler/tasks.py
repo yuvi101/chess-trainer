@@ -1,11 +1,19 @@
 import subprocess
+from celery import Task, chain
 from celery_app import app
-from celery import chain
 import logging
+from shared.notifications import post_to_slack
 
 logging.basicConfig(level=logging.INFO)
 
-@app.task(autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
+
+class NotifyOnFailureTask(Task):
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        post_to_slack(f":x: `{self.name}` failed after {self.max_retries} retries: {exc}")
+        super().on_failure(exc, task_id, args, kwargs, einfo)
+
+
+@app.task(base=NotifyOnFailureTask, autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
 def collect_games():
     logging.info("Starting game collection...")
     result = subprocess.run(
@@ -20,7 +28,7 @@ def collect_games():
     return result.stdout
 
 
-@app.task(autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
+@app.task(base=NotifyOnFailureTask, autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
 def analyze_games():
     logging.info("Starting game analysis...")
     result = subprocess.run(
@@ -34,7 +42,7 @@ def analyze_games():
     logging.info("Analysis done.")
     return result.stdout
 
-@app.task(autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
+@app.task(base=NotifyOnFailureTask, autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
 def generate_report():
     result = subprocess.run(
         ["python", "/app/reporting/report_generator.py"],

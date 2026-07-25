@@ -8,6 +8,7 @@ from shared.db import get_connection
 from llm_client import call_llm
 import time
 from shared.metrics import push_metrics
+from shared.notifications import post_to_slack
 
 # ---------- Logging ----------
 logging.basicConfig(
@@ -458,6 +459,13 @@ def main():
     })
 
     logging.info(f"Report saved to {report_path}")
+
+    post_to_slack(
+        f":chess_pawn: Weekly chess report ready — "
+        f"{stats['total_games']} games, {len(stats['blunders'])} blunders, "
+        f"{len(stats['mistakes'])} mistakes, avg cp loss {stats['avg_cp_loss']}. "
+        f"Cost: ${report['cost_usd']:.4f} ({report['provider']})."
+    )
 
 
 if __name__ == "__main__":

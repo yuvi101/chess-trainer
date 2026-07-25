@@ -128,6 +128,7 @@ cat > .env << EOF
 LICHESS_USERNAME=your_username
 GEMINI_API_KEY=your_key_here
 LLM_PROVIDER=gemini
+SLACK_WEBHOOK_URL=your_slack_incoming_webhook_url  # optional, for pipeline success/failure alerts
 EOF
 ```
 
@@ -211,6 +212,7 @@ cat > .env << EOF
 LICHESS_USERNAME=your_username
 GEMINI_API_KEY=your_key_here
 LLM_PROVIDER=gemini
+SLACK_WEBHOOK_URL=your_slack_incoming_webhook_url  # optional, for pipeline success/failure alerts
 EOF
 docker-compose up -d
 ```
