@@ -5,7 +5,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-@app.task
+@app.task(autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
 def collect_games():
     logging.info("Starting game collection...")
     result = subprocess.run(
@@ -20,11 +20,11 @@ def collect_games():
     return result.stdout
 
 
-@app.task
+@app.task(autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
 def analyze_games():
     logging.info("Starting game analysis...")
     result = subprocess.run(
-        ["python", "/app/analyzer/game_analyzer.py"],
+        ["python", "/app/analyzer/analyze_game.py"],
         capture_output=True,
         text=True
     )
@@ -34,7 +34,7 @@ def analyze_games():
     logging.info("Analysis done.")
     return result.stdout
 
-@app.task
+@app.task(autoretry_for=(RuntimeError,), retry_backoff=True, max_retries=3)
 def generate_report():
     result = subprocess.run(
         ["python", "/app/reporting/report_generator.py"],
