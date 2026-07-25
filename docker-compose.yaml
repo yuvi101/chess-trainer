@@ -41,11 +41,18 @@ services:
       - stockfish
     environment:
       - LICHESS_USERNAME=${LICHESS_USERNAME}
+      - LLM_PROVIDER=${LLM_PROVIDER}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PUSHGATEWAY_URL=pushgateway:9091
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     volumes:
       #- ./data:/app/data          # shared data folder for both scripts
       - ./collectors:/app/collector
       - ./engine:/app/analyzer
+      - ./reporting:/app/reporting
       - ./shared:/app/shared
+      - ./reports:/app/reports
 
   celery-beat:
     build: ./scheduler
@@ -54,9 +61,16 @@ services:
       - redis
     environment:
       - LICHESS_USERNAME=${LICHESS_USERNAME}
+      - LLM_PROVIDER=${LLM_PROVIDER}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PUSHGATEWAY_URL=pushgateway:9091
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     volumes:
       - ./collectors:/app/collector
       - ./engine:/app/analyzer
+      - ./reporting:/app/reporting
+      - ./reports:/app/reports
       - ./shared:/app/shared
 
   reporting:
@@ -70,6 +84,7 @@ services:
       - POSTGRES_USER=chess
       - POSTGRES_PASSWORD=chess
       - PUSHGATEWAY_URL=pushgateway:9091
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     volumes:
       - ./shared:/app/shared
       - ./reporting:/app
