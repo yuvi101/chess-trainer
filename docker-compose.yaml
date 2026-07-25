@@ -43,8 +43,8 @@ services:
       - LICHESS_USERNAME=${LICHESS_USERNAME}
     volumes:
       #- ./data:/app/data          # shared data folder for both scripts
-      - ./collector:/app/collector
-      - ./analyzer:/app/analyzer
+      - ./collectors:/app/collector
+      - ./engine:/app/analyzer
       - ./shared:/app/shared
 
   celery-beat:
