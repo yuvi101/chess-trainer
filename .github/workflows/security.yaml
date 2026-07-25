@@ -3,6 +3,25 @@ name: "Security Scan"
 on: [push, pull_request]
 
 jobs:
+  test:
+    name: Pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest
+          pip install -r engine/requirements.txt
+          pip install -r reporting/requirements.txt
+
+      - name: Run tests
+        run: pytest tests/
+
   sca_scan:
     name: Snyk (SCA)
     runs-on: ubuntu-latest
