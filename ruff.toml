@@ -1,0 +1,9 @@
+target-version = "py311"
+line-length = 120
+
+[lint]
+# Deliberately narrow: pyflakes (F) + a handful of pycodestyle error codes (E4/E7/E9).
+# Catches real bugs (unused imports/variables, undefined names, syntax issues),
+# not style/formatting preferences. Merely having a ruff.toml present otherwise
+# opts into a much broader default ruleset.
+select = ["E4", "E7", "E9", "F"]
