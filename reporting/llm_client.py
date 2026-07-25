@@ -47,6 +47,10 @@ def _call_gemini(prompt):
     }
 
 
+def _calculate_claude_cost(input_tokens, output_tokens):
+    return (input_tokens * 3 / 1_000_000) + (output_tokens * 15 / 1_000_000)
+
+
 def _call_claude(prompt):
     import requests
 
@@ -76,7 +80,7 @@ def _call_claude(prompt):
     input_tokens = data["usage"]["input_tokens"]
     output_tokens = data["usage"]["output_tokens"]
     total_tokens = input_tokens + output_tokens
-    cost_usd = (input_tokens * 3 / 1_000_000) + (output_tokens * 15 / 1_000_000)
+    cost_usd = _calculate_claude_cost(input_tokens, output_tokens)
 
     logging.info(f"Claude response received — latency: {latency_ms}ms, cost: ${cost_usd:.4f}")
 
