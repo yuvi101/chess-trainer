@@ -63,9 +63,11 @@ def save_game_to_db(game):
         ))
         conn.commit()
         logging.info(f"Saved game {game['id']} to DB — you played {my_color} vs {opponent}")
+        return True
     except Exception as e:
         conn.rollback()
         logging.error(f"Failed to save game {game['id']}: {e}")
+        return False
     finally:
         cur.close()
         conn.close()
@@ -87,7 +89,10 @@ def main():
     for game_str in games:
         try:
             game = json.loads(game_str)  # parse each line into a dict
-            save_game_to_db(game)
+            if save_game_to_db(game):
+                games_collected += 1
+            else:
+                failures += 1
         except Exception as e:
             logging.error(f"Failed to save game: {e}")
             failures += 1
