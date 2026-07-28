@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 import chess
 import chess.engine
@@ -123,11 +122,6 @@ def analyze_game(game_id, lichess_id, moves_str, color, engine):
     total_cp_loss = 0
     
     depth = 20
-    # Get starting evaluation
-    info_start = engine.analyse(board, chess.engine.Limit(depth=depth))
-    start_eval = info_start["score"].pov(my_color).score(mate_score=1000)
-    
-    end_eval = None
     my_moves = 0
 
     for i, move in enumerate(moves):
@@ -272,7 +266,6 @@ def analyze_all_games():
         "inaccuracy_rate_percentage": inaccuracy_rate,
         "accuracy_percentage": accuracy_rate,
         "pipeline_failures_total": total_failures,
-        "analysis_duration_seconds": total_duration,
         "total_cp_loss": total_cp_loss_all_games,
         "avg_cp_loss_per_game": avg_cp_loss_per_game,
         "avg_cp_loss_per_move": avg_cp_loss_per_move,

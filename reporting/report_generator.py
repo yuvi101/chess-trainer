@@ -147,7 +147,6 @@ def render_move_boards(stats):
     Returns dict: { (lichess_id, move_number): svg_string }
     """
     boards = {}
-    significant_labels = {"Blunder", "Mistake", "Good"}
 
     for game in stats["games"].values():
         moves_str = game["moves"]
@@ -331,11 +330,6 @@ def generate_html_report(report_text, boards, stats):
         lichess_id = match.group(1)
         move_number = int(match.group(2))
         key = (lichess_id, move_number)
-
-        # Look up opponent and game number
-        game = stats["games"].get(lichess_id, {})
-        opponent = game.get("opponent", lichess_id)  # fallback to ID if not found
-        game_number = game.get("game_number", "?")
 
         if key in boards:
             svg = boards[key]
